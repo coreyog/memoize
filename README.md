@@ -1,1 +1,5 @@
-# memoize2
+# Memoize
+
+A generic memoization library.
+
+Needs testing.
