@@ -44,3 +44,11 @@ m([3]int{1, 2, 3}) // "collides" with first call, work won't run
 
 Because I want to return a func with the exact same parameter list and return values
 as the provided input, any errors that arise will panic.
+
+Note to self:
+
+```
+gitsem <major|minor|patch>
+git push
+goreleaser release --rm-dist
+```
