@@ -1,6 +1,9 @@
 package memoize
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
 func Memo[T any](fn T) (m T, err error) {
 	fnt := reflect.TypeOf(fn)
@@ -22,9 +25,29 @@ func Memo[T any](fn T) (m T, err error) {
 	cacheRoot := map[interface{}]interface{}{}
 
 	ret := reflect.MakeFunc(fnt, func(args []reflect.Value) (results []reflect.Value) {
+		defer func() {
+			r := recover()
+			if r == nil {
+				return
+			}
+
+			err, ok := r.(error)
+			if !ok {
+				// should always be an error, but just in case...
+				panic(r)
+			}
+
+			panic(fmt.Errorf("panic in memo stub: %w", err))
+		}()
+
 		cResults := fillAndCheck(cacheRoot, args)
 		if cResults == nil {
-			results = fnv.Call(args)
+			if fnt.IsVariadic() {
+				results = fnv.CallSlice(args)
+			} else {
+				results = fnv.Call(args)
+			}
+
 			fillAndSet(cacheRoot, args, results)
 		} else {
 			results = cResults
@@ -42,10 +65,12 @@ func fillAndCheck(cacheRoot map[interface{}]interface{}, args []reflect.Value) (
 	m = cacheRoot
 
 	for _, arg := range args {
-		next, ok = m.(map[interface{}]interface{})[arg.Interface()]
+		value := normalize(arg.Interface())
+
+		next, ok = m.(map[interface{}]interface{})[value]
 		if !ok {
 			next = map[interface{}]interface{}{}
-			m.(map[interface{}]interface{})[arg.Interface()] = next
+			m.(map[interface{}]interface{})[value] = next
 		}
 
 		m = next
@@ -68,8 +93,36 @@ func fillAndSet(cacheRoot map[interface{}]interface{}, args []reflect.Value, res
 
 	for _, arg := range args {
 		prev = m.(map[interface{}]interface{})
-		m = prev[arg.Interface()]
+		value := normalize(arg.Interface())
+
+		m = prev[value]
 	}
 
-	prev[args[len(args)-1].Interface()] = results
+	value := normalize(args[len(args)-1].Interface())
+
+	prev[value] = results
+}
+
+func normalize(arg interface{}) (root interface{}) {
+	argT := reflect.TypeOf(arg)
+	if argT.Kind() == reflect.Slice {
+		return normalizeSlice(arg)
+	}
+
+	return arg
+}
+
+func normalizeSlice(arg interface{}) (norm interface{}) {
+	argV := reflect.ValueOf(arg)
+	length := argV.Len()
+
+	arr := reflect.New(reflect.ArrayOf(length, argV.Type().Elem())).Elem()
+
+	for i := 0; i < length; i++ {
+		arr.Index(i).Set(reflect.ValueOf(normalize(argV.Index(i).Interface())))
+	}
+
+	reflect.Copy(arr, argV)
+
+	return arr.Interface()
 }

@@ -74,3 +74,107 @@ func TestManyArgsManyRets(t *testing.T) {
 
 	assert.Equal(t, 1, called)
 }
+
+func TestSlice(t *testing.T) {
+	called := 0
+	work := func(x []int) []int {
+		called++
+		return x
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	for i := 0; i < 1000; i++ {
+		m([]int{1, 2, 3})
+	}
+
+	assert.Equal(t, 1, called)
+}
+
+func TestVariadic(t *testing.T) {
+	called := 0
+	work := func(x ...int) []int {
+		called++
+		return x
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	for i := 0; i < 1000; i++ {
+		switch i % 3 {
+		case 0:
+			m(0)
+		case 1:
+			m(0, 1)
+		case 2:
+			m(0, 1, 2)
+		}
+	}
+
+	assert.Equal(t, 3, called)
+}
+
+func TestMatrix(t *testing.T) {
+	called := 0
+	work := func(x [4][4]int) [4][4]int {
+		called++
+		return x
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	for i := 0; i < 1000; i++ {
+		m([4][4]int{
+			{1, 2, 3, 4},
+			{5, 6, 7, 8},
+			{9, 10, 11, 12},
+			{13, 14, 15, 16},
+		})
+	}
+
+	assert.Equal(t, 1, called)
+}
+
+func TestBadParamType(t *testing.T) {
+	work := func(x map[string]int) map[string]int {
+		return x
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected panic")
+			return
+		}
+
+		err := r.(error)
+
+		assert.Error(t, err)
+	}()
+
+	_ = m(map[string]int{})
+
+	t.Error("should have panicked")
+}
+
+func TestSliceVsArray(t *testing.T) {
+	called := 0
+	work := func(x interface{}) interface{} {
+		called++
+		return x
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	m([]int{1, 2, 3})
+	m([3]int{1, 2, 3})
+
+	assert.Equal(t, 1, called)
+}
