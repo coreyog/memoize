@@ -1,10 +1,28 @@
 package memoize
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSimple(t *testing.T) {
+	called := 0
+	work := func(x int) int {
+		called++
+		return x
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	for i := 0; i < 1000; i++ {
+		m(0)
+	}
+
+	assert.Equal(t, 1, called)
+}
 
 func TestBadFuncErrors(t *testing.T) {
 	_, err := Memo("not a func")
@@ -39,23 +57,6 @@ func TestMultiCall(t *testing.T) {
 	}
 
 	assert.Equal(t, called, 200)
-}
-
-func TestSimple(t *testing.T) {
-	called := 0
-	work := func(x int) int {
-		called++
-		return x
-	}
-
-	m, err := Memo(work)
-	assert.NoError(t, err)
-
-	for i := 0; i < 1000; i++ {
-		m(0)
-	}
-
-	assert.Equal(t, 1, called)
 }
 
 func TestManyArgsManyRets(t *testing.T) {
@@ -177,4 +178,53 @@ func TestSliceVsArray(t *testing.T) {
 	m([3]int{1, 2, 3})
 
 	assert.Equal(t, 1, called)
+}
+
+func TestMapReturn(t *testing.T) {
+	called := 0
+	work := func(x int) map[int]int {
+		called++
+		return map[int]int{x: x}
+	}
+
+	m, err := Memo(work)
+	assert.NoError(t, err)
+
+	map1 := m(1)
+	map2 := m(1)
+
+	if !reflect.DeepEqual(map1, map2) {
+		t.Error("results not equal")
+	}
+
+	assert.Equal(t, 1, called)
+}
+
+func TestRecursion(t *testing.T) {
+	called := 0
+
+	var f func(int) int   // predefine
+	f = func(x int) int { // initialize
+		called++
+		if x <= 1 {
+			return 1
+		}
+
+		return x * f(x-1) // factorial
+	}
+
+	f, err := Memo(f) // overwrite
+	assert.NoError(t, err)
+
+	x := f(10) // calls f(10), f(9), f(8), ..., f(1)
+	assert.Equal(t, 3628800, x)
+	assert.Equal(t, 10, called)
+
+	x = f(11) // only calls f(11)
+	assert.Equal(t, 39916800, x)
+	assert.Equal(t, 11, called)
+
+	x = f(5) // no new calls
+	assert.Equal(t, 120, x)
+	assert.Equal(t, 11, called)
 }

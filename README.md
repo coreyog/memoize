@@ -4,13 +4,16 @@ A generic memoization library.
 
 Needs more testing before going to prod.
 
+See tests for examples.
+
 Not every function can be memoized. The types of allowed parameters are limited
-by this library.
+by this library. I believe the return can be anything (channels, funcs, maps).
 
 ### Do's:
 * primitives
 * 1D slices
 * ND arrays
+* Variadic
 * structs containing only Do's
 
 ### Don'ts:
