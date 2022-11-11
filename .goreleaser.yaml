@@ -1,0 +1,15 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+changelog:
+  sort: asc
+release:
+  github:
+    owner: coreyog
+    name: memoize
+  mode: replace
+  header: |
+    ## Memoize ({{ .Date }})
