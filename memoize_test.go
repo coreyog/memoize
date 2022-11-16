@@ -7,6 +7,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type Model struct {
+	ID     int
+	Called *int
+}
+
+func NewModel() *Model {
+	return &Model{ID: 1, Called: new(int)}
+}
+
+func (m *Model) PointerReceiver(x int) int {
+	*m.Called++
+	return m.ID
+}
+
+func (m Model) NonPointerReceiver(x int) int {
+	*m.Called++
+	return m.ID
+}
+
 func TestSimple(t *testing.T) {
 	called := 0
 	work := func(x int) int {
@@ -227,4 +246,23 @@ func TestRecursion(t *testing.T) {
 	x = f(5) // no new calls
 	assert.Equal(t, 120, x)
 	assert.Equal(t, 11, called)
+}
+
+func TestMemberFuncs(t *testing.T) {
+	model := NewModel()
+	assert.NotNil(t, model.Called)
+	assert.Equal(t, 0, *model.Called)
+
+	m1, err := Memo(model.PointerReceiver)
+	assert.NoError(t, err)
+
+	m2, err := Memo(model.NonPointerReceiver)
+	assert.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		m1(0)
+		m2(0)
+	}
+
+	assert.Equal(t, 2, *model.Called)
 }
