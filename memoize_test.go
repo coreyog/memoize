@@ -33,7 +33,7 @@ func TestSimple(t *testing.T) {
 		return x
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	for i := 0; i < 1000; i++ {
@@ -43,19 +43,6 @@ func TestSimple(t *testing.T) {
 	assert.Equal(t, 1, called)
 }
 
-func TestBadFuncErrors(t *testing.T) {
-	_, err := Memo("not a func")
-	assert.Equal(t, err, ErrNotAFunc)
-
-	noArgs := func() bool { return true }
-	_, err = Memo(noArgs)
-	assert.Equal(t, err, ErrMissingArgs)
-
-	noReturns := func(x int) {}
-	_, err = Memo(noReturns)
-	assert.Equal(t, err, ErrMissingReturns)
-}
-
 func TestMultiCall(t *testing.T) {
 	called := 0
 	square := func(x int) int {
@@ -63,7 +50,7 @@ func TestMultiCall(t *testing.T) {
 		return x * x
 	}
 
-	m, err := Memo(square)
+	m, _, err := Memo(square)
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -85,7 +72,7 @@ func TestManyArgsManyRets(t *testing.T) {
 		return x, y, z
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	for i := 0; i < 1000; i++ {
@@ -102,12 +89,28 @@ func TestSlice(t *testing.T) {
 		return x
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	for i := 0; i < 1000; i++ {
 		m([]int{1, 2, 3})
 	}
+
+	assert.Equal(t, 1, called)
+}
+
+func TestNilSlice(t *testing.T) {
+	called := 0
+	work := func(x []int) []int {
+		called++
+		return x
+	}
+
+	m, _, err := Memo(work)
+	assert.NoError(t, err)
+
+	m(nil) // 1
+	m(nil)
 
 	assert.Equal(t, 1, called)
 }
@@ -119,7 +122,7 @@ func TestVariadic(t *testing.T) {
 		return x
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	for i := 0; i < 1000; i++ {
@@ -143,7 +146,7 @@ func TestMatrix(t *testing.T) {
 		return x
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	for i := 0; i < 1000; i++ {
@@ -163,7 +166,7 @@ func TestBadParamType(t *testing.T) {
 		return x
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	defer func() {
@@ -190,7 +193,7 @@ func TestSliceVsArray(t *testing.T) {
 		return x
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	m([]int{1, 2, 3})
@@ -206,7 +209,7 @@ func TestMapReturn(t *testing.T) {
 		return map[int]int{x: x}
 	}
 
-	m, err := Memo(work)
+	m, _, err := Memo(work)
 	assert.NoError(t, err)
 
 	map1 := m(1)
@@ -232,7 +235,7 @@ func TestRecursion(t *testing.T) {
 		return x * f(x-1) // factorial
 	}
 
-	f, err := Memo(f) // overwrite
+	f, _, err := Memo(f) // overwrite
 	assert.NoError(t, err)
 
 	x := f(10) // calls f(10), f(9), f(8), ..., f(1)
@@ -253,10 +256,10 @@ func TestMemberFuncs(t *testing.T) {
 	assert.NotNil(t, model.Called)
 	assert.Equal(t, 0, *model.Called)
 
-	m1, err := Memo(model.PointerReceiver)
+	m1, _, err := Memo(model.PointerReceiver)
 	assert.NoError(t, err)
 
-	m2, err := Memo(model.NonPointerReceiver)
+	m2, _, err := Memo(model.NonPointerReceiver)
 	assert.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
@@ -265,4 +268,28 @@ func TestMemberFuncs(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, *model.Called)
+}
+
+func TestNonErrorPanic(t *testing.T) {
+	work := func(x int) int {
+		panic("test panic")
+	}
+
+	m, _, err := Memo(work)
+	assert.NoError(t, err)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected panic")
+			return
+		}
+
+		err, _ := r.(error)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "test panic", r)
+	}()
+
+	m(0)
 }
